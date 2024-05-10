@@ -1,3 +1,4 @@
+use bytemuck::{self, bytes_of};
 use clap::Parser;
 use hex;
 use pnet::datalink::Channel::Ethernet;
@@ -26,7 +27,7 @@ struct Cli {
     )]
     threads_number: usize,
 
-    /// Number of seconnds to pause before counters output
+    /// Number of seconds to pause before counters output
     #[arg(
         short = 's',
         long = "sleep",
@@ -34,6 +35,13 @@ struct Cli {
         default_value_t = 1
     )]
     sleep: usize,
+
+    /// Add packet number to end of packet data
+    #[arg(
+        long = "packet-number",
+        default_value_t = false
+    )]
+    add_packet_number: bool,
 }
 
 fn main() {
@@ -56,12 +64,13 @@ fn main() {
 
     let packet_ref = Arc::new(RwLock::new(packet));
     let interface_ref = Arc::new(RwLock::new(interface));
-
+    let add_packet_number_ref = Arc::new(RwLock::new(cli.add_packet_number));
     let mut counters: Vec<Arc<Mutex<(usize, usize)>>> = Vec::new();
 
     for thread_number in 0..cli.threads_number {
         let interface_ref = Arc::clone(&interface_ref);
         let packet_ref = Arc::clone(&packet_ref);
+        let add_packet_number_ref = Arc::clone(&add_packet_number_ref);
 
         counters.push(Arc::new(Mutex::new((0, 0))));
         let counter_ref = Arc::clone(&counters[thread_number]);
@@ -69,6 +78,7 @@ fn main() {
         thread::spawn(move || {
             let interface = interface_ref.read().unwrap();
             let packet = packet_ref.read().unwrap();
+            let add_packet_number = *add_packet_number_ref.read().unwrap();
 
             // Create a new channel, dealing with layer 2 packets
             let (mut tx, _rx) = match pnet::datalink::channel(&interface, Default::default()) {
@@ -83,13 +93,25 @@ fn main() {
             let mut ok_counter: usize = 0;
             let mut error_counter: usize = 0;
 
-            loop {
-                match tx.send_to(&packet, None).unwrap() {
-                    Ok(_) => ok_counter += 1,
-                    Err(_) => error_counter += 1,
-                }
+            if add_packet_number {
+                loop {
+                    match tx.send_to(&[&packet, bytes_of(&ok_counter)].concat(), None).unwrap() {
+                        Ok(_) => ok_counter += 1,
+                        Err(_) => error_counter += 1,
+                    }
 
-                *counter_ref.lock().unwrap() = (ok_counter, error_counter);
+                    *counter_ref.lock().unwrap() = (ok_counter, error_counter);
+                }
+            }
+            else {
+                loop {
+                    match tx.send_to(&packet, None).unwrap() {
+                        Ok(_) => ok_counter += 1,
+                        Err(_) => error_counter += 1,
+                    }
+
+                    *counter_ref.lock().unwrap() = (ok_counter, error_counter);
+                }
             }
         });
     }

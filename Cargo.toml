@@ -4,6 +4,7 @@ version = "0.0.1"
 edition = "2021"
 
 [dependencies]
+bytemuck = "1.15.0"
 clap = { version = "4.5.4", features = ["derive"] }
 hex = "0.4.3"
 pnet = "0.34.0"
