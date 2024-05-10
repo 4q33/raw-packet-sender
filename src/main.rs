@@ -8,7 +8,8 @@ use std::{thread, time};
 
 // Command line args parsing struct (CLAP)
 #[derive(Parser, Debug, Clone)]
-#[command(author="4q33",
+#[command(
+    author = "4q33",
     version = "0.0.1",
     about = "Small tool for sending raw ethernet packets",
     long_about = r###"Small tool for sending raw ethernet packets
@@ -24,7 +25,8 @@ Where:
 
 If activated thread-number and packet-number then thread number will be added before packet number in the way:
   raw packet data + thread number + packet number
-Size of thread number and packet number values is usize. Endiannes is inferred from system."###)]
+Size of thread number and packet number values is usize. Endiannes is inferred from system."###
+)]
 struct Cli {
     /// Packet as hex string
     #[arg(short, long, value_name = "PACKET")]
@@ -53,17 +55,11 @@ struct Cli {
     sleep: usize,
 
     /// Add thread number to the end of packet data
-    #[arg(
-        long = "thread-number",
-        default_value_t = false
-    )]
+    #[arg(long = "thread-number", default_value_t = false)]
     add_thread_number: bool,
 
     /// Add packet number to the end of packet data
-    #[arg(
-        long = "packet-number",
-        default_value_t = false
-    )]
+    #[arg(long = "packet-number", default_value_t = false)]
     add_packet_number: bool,
 }
 
@@ -80,8 +76,8 @@ fn main() {
 
     let packet_length = match (cli.add_thread_number, cli.add_packet_number) {
         (true, true) => packet.len() + usize::BITS as usize / 8,
-        (true, false)|(false,true) => packet.len() + usize::BITS as usize / 4,
-        (false, false) => packet.len()
+        (true, false) | (false, true) => packet.len() + usize::BITS as usize / 4,
+        (false, false) => packet.len(),
     };
 
     let interface = pnet::datalink::interfaces()
@@ -125,21 +121,18 @@ fn main() {
             let mut error_counter: usize = 0;
 
             // TODO increase performance for thread number adding
-            match (add_thread_number, add_packet_number) { 
+            match (add_thread_number, add_packet_number) {
                 (true, true) => {
                     loop {
                         // TODO use usize::be_bytes_of instead of bytemuck crate
-                        match tx.send_to(&[&packet, bytes_of(&thread_number), bytes_of(&ok_counter)].concat(), None).unwrap() {
-                            Ok(_) => ok_counter += 1,
-                            Err(_) => error_counter += 1,
-                        }
-                        *counter_ref.lock().unwrap() = (ok_counter, error_counter);
-                    }
-                },
-
-                (true, false) => {
-                    loop {
-                        match tx.send_to(&[&packet, bytes_of(&thread_number)].concat(), None).unwrap() {
+                        match tx
+                            .send_to(
+                                &[&packet, bytes_of(&thread_number), bytes_of(&ok_counter)]
+                                    .concat(),
+                                None,
+                            )
+                            .unwrap()
+                        {
                             Ok(_) => ok_counter += 1,
                             Err(_) => error_counter += 1,
                         }
@@ -147,25 +140,35 @@ fn main() {
                     }
                 }
 
-                (false, true) => {
-                    loop {
-                        match tx.send_to(&[&packet, bytes_of(&ok_counter)].concat(), None).unwrap() {
-                            Ok(_) => ok_counter += 1,
-                            Err(_) => error_counter += 1,
-                        }
-                        *counter_ref.lock().unwrap() = (ok_counter, error_counter);
+                (true, false) => loop {
+                    match tx
+                        .send_to(&[&packet, bytes_of(&thread_number)].concat(), None)
+                        .unwrap()
+                    {
+                        Ok(_) => ok_counter += 1,
+                        Err(_) => error_counter += 1,
                     }
+                    *counter_ref.lock().unwrap() = (ok_counter, error_counter);
                 },
-                
-                (false, false) => {
-                    loop {
-                        match tx.send_to(&packet, None).unwrap() {
-                            Ok(_) => ok_counter += 1,
-                            Err(_) => error_counter += 1,
-                        }
-                        *counter_ref.lock().unwrap() = (ok_counter, error_counter);
+
+                (false, true) => loop {
+                    match tx
+                        .send_to(&[&packet, bytes_of(&ok_counter)].concat(), None)
+                        .unwrap()
+                    {
+                        Ok(_) => ok_counter += 1,
+                        Err(_) => error_counter += 1,
                     }
-                }
+                    *counter_ref.lock().unwrap() = (ok_counter, error_counter);
+                },
+
+                (false, false) => loop {
+                    match tx.send_to(&packet, None).unwrap() {
+                        Ok(_) => ok_counter += 1,
+                        Err(_) => error_counter += 1,
+                    }
+                    *counter_ref.lock().unwrap() = (ok_counter, error_counter);
+                },
             }
         });
     }
