@@ -13,7 +13,7 @@ use std::{thread, time};
     about = "Small tool for sending raw ethernet packets",
     long_about = r###"Small tool for sending raw ethernet packets
 Usage example: 
-  trafgen --packet 00..00 --interface dummy0 --threads 1 --sleep 1 --thread-number --packet-number
+  raw-packet-sender --packet 00..00 --interface dummy0 --threads 1 --sleep 1 --thread-number --packet-number
 Where:
   packet - raw hex string of ethernet packet (in the example middle part of 62 zeroes is replaced by "..")
   interface - name of the ethernet inteface to which packets will be sent 
