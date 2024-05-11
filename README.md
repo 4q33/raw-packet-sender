@@ -4,7 +4,7 @@ Small tool for sending raw ethernet packets
 ## Usage example
 
 ``` 
-raw-packet-sender --packet 00..00 --interface dummy0 --threads 1 --sleep 1 --thread-number --packet-number
+raw-packet-sender --packet 00..00 --interface dummy0 --threads 1 --watch 1 --thread-number --packet-number --sleep 1
 ```
 
 Where:
