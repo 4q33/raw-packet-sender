@@ -84,6 +84,7 @@ fn main() {
         &cli.packet
     ));
 
+    // TODO text and fix size of packet if packet.len less than 64 bytes
     let packet_length = match (cli.add_thread_number, cli.add_packet_number) {
         (true, true) => packet.len() + usize::BITS as usize / 8,
         (true, false) | (false, true) => packet.len() + usize::BITS as usize / 4,
