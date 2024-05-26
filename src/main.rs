@@ -84,15 +84,14 @@ fn main() {
         &cli.packet
     ));
 
-    // TODO text and fix size of packet if packet.len less than 64 bytes
     let packet_length = match (cli.add_thread_number, cli.add_packet_number) {
         (true, true) => packet.len() + usize::BITS as usize / 8,
         (true, false) | (false, true) => packet.len() + usize::BITS as usize / 4,
         (false, false) => packet.len(),
     };
 
-    let sleep_micros = match cli.sleep{
-        Some(x) => Some((x*1000.0) as u64),
+    let sleep_nanos = match cli.sleep{
+        Some(x) => Some((x*1_000_000.0) as u64),
         None => None
     };
 
@@ -106,7 +105,7 @@ fn main() {
     let interface_ref = Arc::new(RwLock::new(interface));
     let add_thread_number_ref = Arc::new(RwLock::new(cli.add_thread_number));
     let add_packet_number_ref = Arc::new(RwLock::new(cli.add_packet_number));
-    let sleep_micros_ref = Arc::new(RwLock::new(sleep_micros));
+    let sleep_nanos_ref = Arc::new(RwLock::new(sleep_nanos));
     let mut counters: Vec<Arc<Mutex<(usize, usize)>>> = Vec::new();
 
     for thread_number in 0..cli.threads_number {
@@ -114,7 +113,7 @@ fn main() {
         let packet_ref = Arc::clone(&packet_ref);
         let add_thread_number_ref = Arc::clone(&add_thread_number_ref);
         let add_packet_number_ref = Arc::clone(&add_packet_number_ref);
-        let sleep_micros_ref = Arc::clone(&sleep_micros_ref);
+        let sleep_nanos_ref = Arc::clone(&sleep_nanos_ref);
 
         counters.push(Arc::new(Mutex::new((0, 0))));
         let counter_ref = Arc::clone(&counters[thread_number]);
@@ -124,9 +123,8 @@ fn main() {
             let packet = packet_ref.read().unwrap();
             let add_thread_number = *add_thread_number_ref.read().unwrap();
             let add_packet_number = *add_packet_number_ref.read().unwrap();
-            let sleep_micros = *sleep_micros_ref.read().unwrap();
+            let sleep_nanos = *sleep_nanos_ref.read().unwrap();
             
-
             // Create a new channel, dealing with layer 2 packets
             let (mut tx, _rx) = match pnet::datalink::channel(&interface, Default::default()) {
                 Ok(Ethernet(tx, rx)) => (tx, rx),
@@ -139,7 +137,10 @@ fn main() {
 
             let mut ok_counter: usize = 0;
             let mut error_counter: usize = 0;
-            if let Some(sleep_micros) = sleep_micros {
+            if let Some(sleep_nanos) = sleep_nanos {
+                let sleep_duration = Duration::from_nanos(sleep_nanos);
+                println!("{:?}", sleep_duration);
+
                 // TODO increase performance for thread number adding
                 match (add_thread_number, add_packet_number) {
                     (true, true) => {
@@ -157,7 +158,7 @@ fn main() {
                                 Err(_) => error_counter += 1,
                             }
                             *counter_ref.lock().unwrap() = (ok_counter, error_counter);
-                            thread::sleep(Duration::from_micros(sleep_micros));
+                            thread::sleep(sleep_duration);
                         }
                     }
 
@@ -170,7 +171,7 @@ fn main() {
                             Err(_) => error_counter += 1,
                         }
                         *counter_ref.lock().unwrap() = (ok_counter, error_counter);
-                        thread::sleep(Duration::from_micros(sleep_micros));
+                        thread::sleep(sleep_duration);
                     },
 
                     (false, true) => loop {
@@ -182,7 +183,7 @@ fn main() {
                             Err(_) => error_counter += 1,
                         }
                         *counter_ref.lock().unwrap() = (ok_counter, error_counter);
-                        thread::sleep(Duration::from_micros(sleep_micros));
+                        thread::sleep(sleep_duration);
                     },
 
                     (false, false) => loop {
@@ -191,7 +192,7 @@ fn main() {
                             Err(_) => error_counter += 1,
                         }
                         *counter_ref.lock().unwrap() = (ok_counter, error_counter);
-                        thread::sleep(Duration::from_micros(sleep_micros));
+                        thread::sleep(sleep_duration);
                     },
                 }
             }
